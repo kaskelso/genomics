@@ -1,0 +1,817 @@
+########## Askelson et al. 2025 Western Screech-owl conservation genomics ###########################
+# GBS (genotyping-by-sequencing) data processing script                                             #
+# This script contains commands to demultiplex two GBS libraries, map them to the Strix aluco       #
+# reference genome https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_031877795.1/ , and call SNPs.   #
+# All work was done on the Cedar server of the Digital Research Alliance of Canada                  #
+# https://www.alliancecan.ca/en                                                                     #
+# This script leverages SLURM array jobs which makes things crazy fast... like you could process    #
+# this data in a day or two fast! But the job setups are a little weird so I explain them in the    #
+# comments.                                                                                         #
+#####################################################################################################
+
+# First we create a .txt file with sample barcodes and sample names for WESO 1
+# There are two samples "weso_plate1_DNBL001" and "weso_plate1_BCBL001" which are negative controls (DNA blank and Barcode Blank)
+# For simplicity we process these samples with all others until the final steps (they have essentially no reads in them as expected)
+
+cat > stack_weso_barcode.txt
+----------------
+ACGG	weso_plate1_WSOR002
+TGCT	weso_plate1_WSAZ001
+CATA	weso_plate1_WSWA002
+CGAG	weso_plate1_ESMA001
+GCTT	weso_plate1_WSVI001
+ATCA	weso_plate1_WSWA007
+GACG	weso_plate1_WSVI002
+CTGT	weso_plate1_WSVI003
+TCAA	weso_plate1_WSCA001
+AGTCA	weso_plate1_WSBC007
+TCACG	weso_plate1_WSBC010
+CTGCA	weso_plate1_WSWA008
+CATCG	weso_plate1_ESMY001
+ATCGA	weso_plate1_WSBC015
+TCGAA	weso_plate1_WSWA009
+ACCTG	weso_plate1_WSVI004
+CTCAG	weso_plate1_WSVI005
+CGCTA	weso_plate1_WSBC016
+CCTGA	weso_plate1_WSBC005
+CGACT	weso_plate1_WSVI006
+ACGCT	weso_plate1_WSWA010
+GCCAT	weso_plate1_WSWA011
+CACGT	weso_plate1_WSNM003
+GTTCCA	weso_plate1_WSCA002
+TGTGCA	weso_plate1_ESMA002
+TTGACA	weso_plate1_WSBC014
+AGCTGA	weso_plate1_WSNM007
+TGGCAA	weso_plate1_WSWA012
+CTATCG	weso_plate1_WSNV001
+GCTGAA	weso_plate1_WSAK001
+TTCCGA	weso_plate1_WSWA013
+GACTCT	weso_plate1_WSCA003
+ATGGCG	weso_plate1_WSBC001
+TCATGG	weso_plate1_WSWA014
+CATCCG	weso_plate1_ESMA003
+CCGTCA	weso_plate1_WSUN001
+GTACGT	weso_plate1_WSBC017
+TAGGCT	weso_plate1_WSWA015
+GGCTAG	weso_plate1_WSNV002
+CATGTA	weso_plate1_WSBC018
+ATTCGG	weso_plate1_ESMA004
+TGACCT	weso_plate1_ESMY002
+GCTACT	weso_plate1_WSBC011
+TCGGTA	weso_plate1_WSOR001
+CTGAGG	weso_plate1_WSOR003
+GCCTTA	weso_plate1_WSCA004
+CGATGT	weso_plate1_WSWA016
+GATTACA	weso_plate1_WSNM006
+GGTAGCA	weso_plate1_WSVI007
+GTGACCA	weso_plate1_WSWA017
+TTATGCA	weso_plate1_WSNM001
+ATTGGCA	weso_plate1_WSNM002
+TGGTACA	weso_plate1_WSWA018
+GACCTCA	weso_plate1_WSAZ003
+TGTGCCA	weso_plate1_WSWA019
+TAGACCG	weso_plate1_WSWA003
+GGATTCA	weso_plate1_ESSC001
+GATCCAA	weso_plate1_WSBC008
+CTGGACA	weso_plate1_WSCO001
+AGACTCG	weso_plate1_WSWA020
+AATTGCG	weso_plate1_WSWA006
+TCCAGGA	weso_plate1_WSNM008
+TCAGCAG	weso_plate1_WSAZ002
+CAGTGCA	weso_plate1_WSWA021
+GTACCGA	weso_plate1_ESNY001
+TGTAACG	weso_plate1_WSCA005
+TACGATA	weso_plate1_WSCA006
+GTAAGCG	weso_plate1_WSBC009
+ATGCAAT	weso_plate1_WSAZ004
+CCGGTAA	weso_plate1_WSWA022
+AGCTCCG	weso_plate1_WSVI008
+AATGGACA	weso_plate1_DNBL001
+AGAATGCA	weso_plate1_WSCA007
+GAATAGCA	weso_plate1_WSBC002
+ATGAGACA	weso_plate1_WSWA004
+TGCCACCA	weso_plate1_WSBC003
+ATAGAGCA	weso_plate1_WSWA005
+ACTCGCCA	weso_plate1_WSCO002
+TAGGAACA	weso_plate1_WSBC019
+GATACGAA	weso_plate1_WSBC006
+GCACCTCA	weso_plate1_WSWA001
+CACTGCCA	weso_plate1_WSNM004
+ACGATGAA	weso_plate1_WSWA023
+CGCACACT	weso_plate1_WSBC012
+AGTGACAA	weso_plate1_BCBL001
+CAAGTAGA	weso_plate1_WSWA024
+GCAAGAAT	weso_plate1_ESMA005
+ACCTACCG	weso_plate1_WSVI009
+CTACCACG	weso_plate1_WSBC013
+TAGAACGA	weso_plate1_WSVI010
+AGCAGTAA	weso_plate1_WSAK002
+GAACTGAA	weso_plate1_WSAK003
+ACTCCACG	weso_plate1_WSBC004
+GAAGACAT	weso_plate1_WSVI011
+CGGTATGT	weso_plate1_WSNM005
+TCCGCACA	weso_plate1_WSBC020
+---------------
+
+# I then manually split this file apart by barcode length
+# this is because when you run them all together process_radtags
+# will arbitrarily shorten all reads to the smallest length (142)
+# by clipping off base pairs. This impacts adapter removal in the next step
+# so I demultiplexed by barcode length.
+
+module load stacks/2.60
+
+# we use inline-null because barcodes appear on the sequence of the forward read
+# pstI is the enzyme for process_radtags to check is intact
+# --barcode-dist-1 is set to 0 so it won't rescue barcodes
+# --score-limit is set to 0 so no filtering, we do that on the next step
+
+cat > stacks_WESO8.sh                #repeat for each barcode length group (4-8)
+----------------------
+#!/bin/bash
+#SBATCH --time=4:59:00
+#SBATCH --mem=50G
+#SBATCH --cpus-per-task=2
+#SBATCH --account=def-dirwin
+
+process_radtags -1 ../KPXJ2LB/ASK16511.20210330/210323_A00987_0157_AH5GWJDRXY/WESO_1_S1_L001_R1_001.fastq.gz \
+-2 ../KPXJ2LB/ASK16511.20210330/210323_A00987_0157_AH5GWJDRXY/WESO_1_S1_L001_R2_001.fastq.gz \
+--inline-null -b weso_barcode8.txt -o . -e pstI \
+--barcode-dist-1 0 \
+--score-limit 0 \
+-y fastq
+--------------------------
+sbatch stacks_WESO8.sh
+
+# Now we use trimmomatic to trim reads.
+# This trims raw reads for quality and adapters and gives back surviving paired reads
+# and unpaired reads who lost mates through filtering.
+# The important bit is the illuminaclip function that removes adapters and barcodes on reads
+# We use custom files that looks for the adapters and unique sample barcodes to trim them
+# in trimmomatics 'palindrome' mode. In this file we all add a string of G's that is known to effect NovaSeq.
+# The barcode list needs to be in the same order as samples and their barcodes for this to correctly work.
+# If detected they are removed and the reverse read is dropped because it contains the same
+# info as the forward read. For further info see trimmomatics manual. http://www.usadellab.org/cms/uploads/supplementary/Trimmomatic/TrimmomaticManual_V0.32.pdf#page=4.08
+
+module load trimmomatic
+
+cat > trim.sh
+-------------------
+#!/bin/bash
+#script to trim data with trimmomatic
+#usage ./trim.sh
+
+while read prefix <&3 && read barcode <&4; do
+
+java -jar $EBROOTTRIMMOMATIC/trimmomatic-0.39.jar PE \
+-phred33 \
+-threads 6 \
+stack_demultiplex/"$prefix".1.fq \
+stack_demultiplex/"$prefix".2.fq \
+stack_demultiplex_trim/"$prefix"_R1.fastq \
+stack_demultiplex_trim/"$prefix"_R1_unpaired.fastq \
+stack_demultiplex_trim/"$prefix"_R2.fastq \
+stack_demultiplex_trim/"$prefix"_R2_unpaired.fastq \
+ILLUMINACLIP:../../../Sept9/GBS_wbnu/adapter_info/"$barcode":2:30:5:2 \
+TRAILING:3 SLIDINGWINDOW:4:10 MINLEN:30
+
+done 3<allsamples_for_trim_weso1.txt 4<../../../Sept9/GBS_wbnu/adapter_info/adapter_list.txt
+
+(ctrl D to finish)
+————---------------
+# make executable:
+chmod +x trim.sh
+
+cat > trim_plate_WESO1_fall2023.sh
+----------------------
+#!/bin/bash
+#SBATCH --time=2:59:00
+#SBATCH --mem=48G
+#SBATCH --cpus-per-task=6
+#SBATCH --account=def-dirwin
+
+./trim.sh
+--------------------------
+sbatch trim_plate_WESO1_fall2023.sh
+
+
+# Ok, this is where things get a little crazy!
+# To really speed things up I started using array jobs on DRAC.
+# Up until this I had submitted jobs that looped through samples.
+# Now we can treat the submission as an array, which is where we feed in
+# our list of samples and for each sample it starts its on job (instead of waiting for the loop to get to each one).
+# This makes things crazy fast, but it's bit hard to wrap your head around at first.
+
+# For this, the important lines are the first in the file. Our first sbatch arguments sets the
+# array dimensions which corresponds to the numer of samples we are processing.
+# Then for each array job we ask for it's resources (time and memory).
+# In each array job we turn our list of samples into an array with readarray -t lines < extras/prefix.list.weso_plate1.bwa
+# Then to select the sample of the array job we won't to process we use the array task ID to grab the sample we want to process with
+# prefix="${lines[${SLURM_ARRAY_TASK_ID}-1]}".
+# Then everything procceds as usual. It's like parallelizing the loops done above.
+
+
+module load bwa samtools picard
+
+cat > align_to_Burrowing_weso1_fall2024.sh
+------------------------
+#!/bin/bash
+#SBATCH --array=1-96  # Set the array range according to your file
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=40G
+#SBATCH --time=0-13:59            #time (DD-HH:MM)
+#SBATCH --account=def-mtodesco
+
+module load bwa samtools picard
+
+# Read the lines of the input file into an array
+readarray -t lines < extras/prefix.list.weso_plate1.bwa
+
+# Access the line corresponding to the current task ID
+prefix="${lines[${SLURM_ARRAY_TASK_ID}-1]}"
+
+# Basis of this script was created by KD Oct 30, 2014; modified by DEI 22 Nov 2014, 5 Nov 2015
+
+#make sure the folders clean_data_trim, sam_zfref and bam_zfref exist
+clean_data="stack_demultiplex_trim"
+sam="sam_weso1_Strix_2024"
+bam="bam_weso1_Strix_2024"
+lane="lane1"
+runbarcode="WESO1"
+log="logs"
+
+# tell it where the executables are
+bwa='bwa'
+samtools='samtools'
+
+## run bwa
+$bwa mem -M -t 10 ../Strix_owl/GCA_031877795.1_bStrAlu1.hap1_genomic.fna \
+$clean_data/"$prefix"_R1.fastq \
+$clean_data/"$prefix"_R2.fastq > $sam/"$prefix".sam
+
+$bwa mem -M -t 10 ../Strix_owl/GCA_031877795.1_bStrAlu1.hap1_genomic.fna \
+$clean_data/"$prefix"_R1_unpaired.fastq > $sam/"$prefix".R1.unpaired.sam
+
+$bwa mem -M -t 10 ../Strix_owl/GCA_031877795.1_bStrAlu1.hap1_genomic.fna \
+$clean_data/"$prefix"_R2_unpaired.fastq > $sam/"$prefix".R2.unpaired.sam
+
+## add read group headers, convert to bam, sort and index
+java -XX:MaxHeapSize=20g -XX:InitialHeapSize=512m -jar $EBROOTPICARD/picard.jar AddOrReplaceReadGroups \
+I=$sam/"$prefix".sam \
+O=$bam/"$prefix".bam \
+RGID=$lane \
+RGPL=ILLUMINA \
+RGLB=LIB."$prefix" \
+RGSM="$prefix" \
+RGPU=$runbarcode \
+SORT_ORDER=coordinate \
+CREATE_INDEX=TRUE
+
+java -XX:MaxHeapSize=20g -XX:InitialHeapSize=512m -jar $EBROOTPICARD/picard.jar AddOrReplaceReadGroups \
+I=$sam/"$prefix".R1.unpaired.sam \
+O=$bam/"$prefix".R1.unpaired.bam \
+RGID=$lane \
+RGPL=ILLUMINA \
+RGLB=LIB."$prefix" \
+RGSM="$prefix" \
+RGPU=$runbarcode \
+SORT_ORDER=coordinate \
+CREATE_INDEX=TRUE
+
+java -XX:MaxHeapSize=20g -XX:InitialHeapSize=512m -jar $EBROOTPICARD/picard.jar AddOrReplaceReadGroups \
+I=$sam/"$prefix".R2.unpaired.sam \
+O=$bam/"$prefix".R2.unpaired.bam \
+RGID=$lane \
+RGPL=ILLUMINA \
+RGLB=LIB."$prefix" \
+RGSM="$prefix" \
+RGPU=$runbarcode \
+SORT_ORDER=coordinate \
+CREATE_INDEX=TRUE
+
+## merge se and pe bam files with samtools and index
+$samtools merge -f $bam/"$prefix".combo.bam \
+$bam/"$prefix".bam \
+$bam/"$prefix".R1.unpaired.bam \
+$bam/"$prefix".R2.unpaired.bam
+
+$samtools index $bam/"$prefix".combo.bam
+
+—————----------
+sbatch align_to_Burrowing_weso1_fall2024.sh
+
+# Now we move to SNP calling.
+# For this we want to split up SNP calling my chromosomes using .interval files for GATK.
+# Birds have relative small genomes so we can just split it by chromosome.
+# I made a file called chrms_names.txt with the names of each chromosome.
+
+while read chr; do echo "$chr" > "$chr".intervals; done < chrms_names.txt
+
+# Now for this step the job becomes even more parallelized.
+# In this we set up a generic haplotypecaller command that takes a
+# "$sample" variable and "$string_from_file" variable.
+# The "$sample" var will be defined in the next step.
+# This array job splits a single samples SNP calling into 41 (41 chromosomes)
+# SNP calling jobs for each chromosome defined by the .interval file
+# I used two different GATK parameters to try and deal with the batch effect in the data
+# --max-reads-per-alignment-start 0 and --pileup-detection true.
+# --max-reads-per-alignment-start 0 just turns off downsampling read depth, after rereading later on
+# I don't think read depth was actually high enough to trigger down sampling.
+# --pileup-detection true supplements variant calling with pileup loci detection like in bcftools.
+# The results were identical to when we analyzed the data without these, so it had no impact and so I decided to just leave it.
+
+cat > haplotype_all_samples.sh
+--------------------------
+#!/bin/bash
+#SBATCH --array=1-41  # Set the array range according to your file
+#SBATCH --time=03:59:00
+#SBATCH --mem=8G
+#SBATCH --cpus-per-task=4
+#SBATCH --account=def-mtodesco
+
+# Read the lines of the input file into an array
+readarray -t lines < ../../Strix_owl/strix_intervals/chrms_names.txt
+
+# Access the line corresponding to the current task ID
+string_from_file="${lines[${SLURM_ARRAY_TASK_ID}-1]}"
+
+module load gatk/4.4
+
+gatk --java-options "-Xmx7g" HaplotypeCaller  \
+-R ../../Strix_owl/GCA_031877795.1_bStrAlu1.hap1_genomic.fna \
+-I ../bam_weso1_Strix_2024/"$sample".combo.bam \
+-L ../../Strix_owl/strix_intervals/"$string_from_file".intervals \
+--max-reads-per-alignment-start 0 \
+--smith-waterman FASTEST_AVAILABLE \
+--pileup-detection true \
+-ERC GVCF \
+-O "$sample"."$string_from_file".g.vcf
+
+--------------------------
+
+#Here we loop through the list of samples and submit an array of SNP calling for different chromosomes for each sample
+
+cat > submit_jobs.sh
+--------------------------
+#!/bin/bash
+
+while read prefix
+do
+
+sample="$prefix"
+
+sbatch --export=sample="$sample" haplotype_all_samples.sh
+
+done < ../extras/prefix.list.weso_plate1.bwa
+--------------------------
+chmod +x submit_jobs.sh
+
+./submit_jobs.sh
+
+
+##################### Repeat above steps for WESO 2 ##############################
+# Ok, now we repeat the above steps on the 2nd GBS library because the next step #
+# in the GATK pipeline will use all the samples                                  #
+# This library has samples from another project, so for the sake of simplicity   #
+# we demultiplex them all out and then just select the owl samples.              #
+##################################################################################
+
+
+cat > barcode.txt
+-------------
+ACGG	weso_plate2_WSRE002
+TGCT	weso_plate2_WSBC021
+CATA	wbnu_plate5_WNNM023
+CGAG	wbnu_plate5_WNOR038
+GCTT	wbnu_plate5_WNAZ021
+ATCA	wbnu_plate5_WNMX030
+GACG	weso_plate2_WSRE001
+CTGT	weso_plate2_WSNM009
+TCAA	weso_plate2_ESNC001
+AGTCA	wbnu_plate5_WNOR039
+TCACG	weso_plate2_WSVI012
+CTGCA	weso_plate2_WSVI013
+CATCG	weso_plate2_WSBC022
+ATCGA	weso_plate2_WSBC023
+TCGAA	weso_plate2_WSCA008
+ACCTG	wbnu_plate5_WNMT025
+CTCAG	weso_plate2_WSBC024
+CGCTA	wbnu_plate5_WNCO053
+CCTGA	wbnu_plate5_WNOR044
+CGACT	weso_plate2_WSWA025
+ACGCT	weso_plate2_WSWA026
+GCCAT	wbnu_plate5_WNOR040
+CACGT	weso_plate2_WSMX001
+GTTCCA	wbnu_plate5_WNNM024
+TGTGCA	weso_plate2_WSRE007
+TTGACA	weso_plate2_WSBC025
+AGCTGA	weso_plate2_WSRE003
+TGGCAA	weso_plate2_WSAK004
+CTATCG	weso_plate2_WSBC026
+GCTGAA	weso_plate2_WSCA009
+TTCCGA	wbnu_plate5_WNSD021
+GACTCT	wbnu_plate5_WNCO054
+ATGGCG	weso_plate2_WSWA027
+TCATGG	wbnu_plate5_WNAZ025
+CATCCG	weso_plate2_WSOR004
+CCGTCA	weso_plate2_WSWA028
+GTACGT	weso_plate2_WSCA010
+TAGGCT	weso_plate2_WSNM010
+GGCTAG	wbnu_plate5_WNOR041
+CATGTA	weso_plate2_WSWA029
+ATTCGG	weso_plate2_ESRE001
+TGACCT	weso_plate2_WSMX002
+GCTACT	wbnu_plate5_WNSD020
+TCGGTA	wbnu_plate5_WNMX031
+CTGAGG	wbnu_plate5_WNAZ026
+GCCTTA	weso_plate2_WSAK005
+CGATGT	weso_plate2_WSCA011
+GATTACA	weso_plate2_WSWA030
+GGTAGCA	wbnu_plate5_WNWY025
+GTGACCA	wbnu_plate5_WNMX028
+TTATGCA	wbnu_plate5_WNBC006
+ATTGGCA	weso_plate2_WSWA031
+TGGTACA	weso_plate2_WSBC027
+GACCTCA	wbnu_plate5_WNOR042
+TGTGCCA	weso_plate2_WSRE004
+TAGACCG	wbnu_plate5_WNNM026
+GGATTCA	wbnu_plate5_WNMX032
+GATCCAA	weso_plate2_WSWA032
+CTGGACA	weso_plate2_WSRE008
+AGACTCG	weso_plate2_WSVI014
+AATTGCG	weso_plate2_WSBC028
+TCCAGGA	weso_plate2_WSVI015
+TCAGCAG	weso_plate2_WSVI016
+CAGTGCA	wbnu_plate5_WNAZ022
+GTACCGA	weso_plate2_WSNV003
+TGTAACG	weso_plate2_ESRE002
+TACGATA	weso_plate2_WSNM011
+GTAAGCG	wbnu_plate5_WNCO051
+ATGCAAT	weso_plate2_WSNM012
+CCGGTAA	wbnu_plate5_WNMX029
+AGCTCCG	weso_plate2_WSRE005
+AATGGACA	weso_plate2_DNBL002
+AGAATGCA	weso_plate2_WSVI017
+GAATAGCA	wbnu_plate5_WNCO052
+ATGAGACA	wbnu_plate5_WNOR043
+TGCCACCA	weso_plate2_WSWA033
+ATAGAGCA	wbnu_plate5_WNMX033
+ACTCGCCA	wbnu_plate5_WNNV035
+TAGGAACA	wbnu_plate5_WNMX034
+GATACGAA	weso_plate2_WSWA034
+GCACCTCA	weso_plate2_WSOR005
+CACTGCCA	weso_plate2_WSWA035
+ACGATGAA	wbnu_plate5_WNAZ023
+CGCACACT	weso_plate2_WSCA012
+AGTGACAA	weso_plate2_BCBL002
+CAAGTAGA	weso_plate2_WSCA013
+GCAAGAAT	weso_plate2_WSBC029
+ACCTACCG	weso_plate2_WSWA036
+CTACCACG	weso_plate2_WSRE006
+TAGAACGA	wbnu_plate5_WNMX035
+AGCAGTAA	wbnu_plate5_WNNM025
+GAACTGAA	weso_plate2_WSWA037
+ACTCCACG	weso_plate2_WSNM013
+GAAGACAT	wbnu_plate5_WNAZ024
+CGGTATGT	weso_plate2_WSWA038
+TCCGCACA	weso_plate2_WSBC030
+------------------
+
+module load stacks/2.60
+
+cat > stacks8.sh
+----------------------
+#!/bin/bash
+#SBATCH --time=5:59:00
+#SBATCH --mem=50G
+#SBATCH --cpus-per-task=2
+#SBATCH --account=def-dirwin
+
+process_radtags -1 ../KPXJ2LB/ASK16511.20210330/210323_A00987_0157_AH5GWJDRXY/WESO_2_S2_L002_R1_001.fastq.gz \
+-2 ../KPXJ2LB/ASK16511.20210330/210323_A00987_0157_AH5GWJDRXY/WESO_2_S2_L002_R2_001.fastq.gz \
+--inline-null -b barcode8.txt -o . -e pstI \
+--barcode-dist-1 0 \
+--score-limit 0 \
+-y fastq
+
+--------------------------
+sbatch stacks8.sh
+
+# Trim WESO 2
+
+module load trimmomatic
+
+cat > trim_fall2023.sh
+-------------------
+#!/bin/bash
+#script to trim data with trimmomatic
+#usage ./trim.sh
+
+while read prefix <&3 && read barcode <&4; do
+
+java -jar $EBROOTTRIMMOMATIC/trimmomatic-0.39.jar PE \
+-phred33 \
+-threads 6 \
+stack_demultiplex/"$prefix".1.fq \
+stack_demultiplex/"$prefix".2.fq \
+stack_demultiplex_trim_forWESO2/"$prefix"_R1.fastq \
+stack_demultiplex_trim_forWESO2/"$prefix"_R1_unpaired.fastq \
+stack_demultiplex_trim_forWESO2/"$prefix"_R2.fastq \
+stack_demultiplex_trim_forWESO2/"$prefix"_R2_unpaired.fastq \
+ILLUMINACLIP:../../../Sept9/GBS_wbnu/adapter_info/"$barcode":2:30:5:2 \
+TRAILING:3 SLIDINGWINDOW:4:10 MINLEN:30
+
+done 3<extras/allsamples_for_trim.txt 4<../../../Sept9/GBS_wbnu/adapter_info/adapter_list.txt
+
+(ctrl D to finish)
+————---------------
+# make executable:
+chmod +x trim_fall2023.sh
+
+cat > trim_plate_WESO2_fall2023.sh
+----------------------
+#!/bin/bash
+#SBATCH --time=2:59:00
+#SBATCH --mem=48G
+#SBATCH --cpus-per-task=6
+#SBATCH --account=def-dirwin
+
+./trim_fall2023.sh
+--------------------------
+sbatch trim_plate_WESO2_fall2023.sh
+
+# Now that everything is demultiplex and trimmed I made a file with just the owl samples (prefix.list.JUST.weso_plate2.bwa)
+
+#Align WESO 2
+
+module load bwa samtools picard
+
+cat > align_to_Strix_weso2_fall2024.sh
+------------------------
+#!/bin/bash
+#SBATCH --array=1-61  # Set the array range according to your file
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=40G
+#SBATCH --time=0-03:59            #time (DD-HH:MM)
+#SBATCH --account=def-mtodesco
+
+module load bwa samtools picard
+
+# Read the lines of the input file into an array
+readarray -t lines < extras/prefix.list.JUST.weso_plate2.bwa
+
+# Access the line corresponding to the current task ID
+prefix="${lines[${SLURM_ARRAY_TASK_ID}-1]}"
+
+# Basis of this script was created by KD Oct 30, 2014; modified by DEI 22 Nov 2014, 5 Nov 2015
+
+#make sure the folders clean_data_trim, sam_zfref and bam_zfref exist
+clean_data="stack_demultiplex_trim_forWESO2"
+sam="sam_weso2_Strix_2024"
+bam="bam_weso2_Strix_2024"
+lane="lane2"
+runbarcode="WESO2"
+log="logs"
+
+# tell it where the executables are
+bwa='bwa'
+samtools='samtools'
+
+## run bwa
+$bwa mem -M -t 10 ../Strix_owl/GCA_031877795.1_bStrAlu1.hap1_genomic.fna \
+$clean_data/"$prefix"_R1.fastq \
+$clean_data/"$prefix"_R2.fastq > $sam/"$prefix".sam
+
+$bwa mem -M -t 10 ../Strix_owl/GCA_031877795.1_bStrAlu1.hap1_genomic.fna \
+$clean_data/"$prefix"_R1_unpaired.fastq > $sam/"$prefix".R1.unpaired.sam
+
+$bwa mem -M -t 10 ../Strix_owl/GCA_031877795.1_bStrAlu1.hap1_genomic.fna \
+$clean_data/"$prefix"_R2_unpaired.fastq > $sam/"$prefix".R2.unpaired.sam
+
+## add read group headers, convert to bam, sort and index
+java -XX:MaxHeapSize=20g -XX:InitialHeapSize=512m -jar $EBROOTPICARD/picard.jar AddOrReplaceReadGroups \
+I=$sam/"$prefix".sam \
+O=$bam/"$prefix".bam \
+RGID=$lane \
+RGPL=ILLUMINA \
+RGLB=LIB."$prefix" \
+RGSM="$prefix" \
+RGPU=$runbarcode \
+SORT_ORDER=coordinate \
+CREATE_INDEX=TRUE
+
+java -XX:MaxHeapSize=20g -XX:InitialHeapSize=512m -jar $EBROOTPICARD/picard.jar AddOrReplaceReadGroups \
+I=$sam/"$prefix".R1.unpaired.sam \
+O=$bam/"$prefix".R1.unpaired.bam \
+RGID=$lane \
+RGPL=ILLUMINA \
+RGLB=LIB."$prefix" \
+RGSM="$prefix" \
+RGPU=$runbarcode \
+SORT_ORDER=coordinate \
+CREATE_INDEX=TRUE
+
+java -XX:MaxHeapSize=20g -XX:InitialHeapSize=512m -jar $EBROOTPICARD/picard.jar AddOrReplaceReadGroups \
+I=$sam/"$prefix".R2.unpaired.sam \
+O=$bam/"$prefix".R2.unpaired.bam \
+RGID=$lane \
+RGPL=ILLUMINA \
+RGLB=LIB."$prefix" \
+RGSM="$prefix" \
+RGPU=$runbarcode \
+SORT_ORDER=coordinate \
+CREATE_INDEX=TRUE
+
+## merge se and pe bam files with samtools and index
+$samtools merge -f $bam/"$prefix".combo.bam \
+$bam/"$prefix".bam \
+$bam/"$prefix".R1.unpaired.bam \
+$bam/"$prefix".R2.unpaired.bam
+
+$samtools index $bam/"$prefix".combo.bam
+
+—————----------
+sbatch align_to_Strix_weso2_fall2024.sh
+
+
+# Now SNP call plate 2
+# Remember that the .interval files were made during library 1 SNP calling
+
+cat > haplotype_all_samples_2.sh
+--------------------------
+#!/bin/bash
+#SBATCH --array=1-41  # Set the array range according to your file
+#SBATCH --time=02:29:00
+#SBATCH --mem=5G
+#SBATCH --cpus-per-task=4
+#SBATCH --account=def-mtodesco
+
+# Read the lines of the input file into an array
+readarray -t lines < ../../Strix_owl/strix_intervals/chrms_names.txt
+
+# Access the line corresponding to the current task ID
+string_from_file="${lines[${SLURM_ARRAY_TASK_ID}-1]}"
+
+module load gatk/4.4
+
+gatk --java-options "-Xmx4g" HaplotypeCaller  \
+-R ../../Strix_owl/GCA_031877795.1_bStrAlu1.hap1_genomic.fna \
+-I ../bam_weso2_Strix_2024/"$sample".combo.bam \
+-L ../../Strix_owl/strix_intervals/"$string_from_file".intervals \
+--max-reads-per-alignment-start 0 \
+--smith-waterman FASTEST_AVAILABLE \
+--pileup-detection true \
+-ERC GVCF \
+-O "$sample"."$string_from_file".g.vcf
+
+--------------------------
+
+#Here we loop through the list of samples and submit an array of SNP calling for different chromosomes for each sample
+
+cat > submit_jobs_2.sh
+--------------------------
+#!/bin/bash
+
+while read prefix
+do
+
+sample="$prefix"
+
+sbatch --export=sample="$sample" haplotype_all_samples_2.sh
+
+done < ../extras/prefix.list.JUST.weso_plate2.bwa
+--------------------------
+chmod +x submit_jobs_2.sh
+
+./submit_jobs_2.sh
+
+
+# Ok with that done, we make map files for GATK GenomicsDBImport,
+# .map files is just the sample name and the path to the sample.
+# Because we will run GenomicsDBImport as an array with each array job
+# a GenomicsDBImport of a chromosome we need a .map file for each chromosome
+# with the sample and path to the chromosome specific .g.vcf
+# chatgpt helped with this
+
+while read chr; do
+    awk -v chr="$chr" 'BEGIN{OFS="\t"} {print $1, "WESO1/gvcf_Strix/"$1"."chr".g.vcf"}' <(ls *"$chr".g.vcf | awk -F"." '{print $1}') > ../../map_files/"$chr"_plate1.map
+done < ../../Strix_owl/strix_intervals/chrms_names.txt
+
+# WESO 2
+
+while read chr; do
+    awk -v chr="$chr" 'BEGIN{OFS="\t"} {print $1, "WESO2/gvcf_2_Strix/"$1"."chr".g.vcf"}' <(ls *"$chr".g.vcf | awk -F"." '{print $1}') > ../../map_files/"$chr"_plate2.map
+done < ../../Strix_owl/strix_intervals/chrms_names.txt
+
+# combine map files into one
+
+while read chr; do cat "$chr"_plate1.map "$chr"_plate2.map > "$chr"_merged.map; done < ../Strix_owl/strix_intervals/chrms_names.txt
+
+# make directories
+
+while read chr; do mkdir "$chr"; done < Strix_owl/strix_intervals/chrms_names.txt
+
+# For me, on DRAC Cedar server GenomicsDBImport is super finicky
+# To get it to be stable, I had to include the following
+# export TILEDB_DISABLE_FILE_LOCKING=1, IDK what it does but GATK help forums recommended it
+# and --genomicsdb-shared-posixfs-optimizations true
+
+cat > genomics_import.sh
+--------------------------
+#!/bin/bash
+#SBATCH --array=1-41  # Set the array range according to your file
+#SBATCH --time=11:59:00
+#SBATCH --mem=20G
+#SBATCH --cpus-per-task=1
+#SBATCH --account=def-mtodesco
+
+module load gatk/4.4
+
+export TILEDB_DISABLE_FILE_LOCKING=1
+
+# Read the lines of the input file into an array
+readarray -t lines < Strix_owl/strix_intervals/chrms_names.txt
+
+# Access the line corresponding to the current task ID
+chr="${lines[${SLURM_ARRAY_TASK_ID}-1]}"
+
+gatk --java-options "-Xmx15g -Xms5g" GenomicsDBImport \
+--genomicsdb-workspace-path "$chr" \
+--overwrite-existing-genomicsdb-workspace true \
+--batch-size 50 \
+--sample-name-map map_files/"$chr"_merged.map \
+--reader-threads 5 \
+-L Strix_owl/strix_intervals/"$chr".intervals \
+--genomicsdb-shared-posixfs-optimizations true
+
+--------------------------
+sbatch genomics_import.sh
+
+#Now we use GenotypeGVCFs, to genotype all our samples together
+
+cat > call_snps.sh
+--------------------------
+#!/bin/bash
+#SBATCH --array=1-41
+#SBATCH --time=23:59:00
+#SBATCH --mem=8G
+#SBATCH --cpus-per-task=1
+#SBATCH --account=def-mtodesco
+
+module load gatk/4.4
+
+# Read the lines of the input file into an array
+readarray -t lines < Strix_owl/strix_intervals/chrms_names.txt
+
+chr="${lines[${SLURM_ARRAY_TASK_ID}-1]}"
+
+gatk --java-options "-Xmx6g" GenotypeGVCFs \
+-R Strix_owl/GCA_031877795.1_bStrAlu1.hap1_genomic.fna \
+-V gendb://"$chr" \
+-L Strix_owl/strix_intervals/"$chr".intervals \
+--standard-min-confidence-threshold-for-calling 20 \
+-O VCF_Strix_2024/weso_plate12_153_variants_"$chr".vcf.gz
+
+--------------------------
+sbatch call_snps.sh
+
+
+#Since we used the "scatter and gather" approach we need to merge our VCFs together
+
+cat > gather_vcfs.sh
+--------------------------
+#!/bin/bash
+#SBATCH --time=08:59:00
+#SBATCH --mem=4G
+#SBATCH --cpus-per-task=1
+#SBATCH --account=def-mtodesco
+
+module load gatk/4.4
+
+tmp=""
+while read chr
+do
+
+        tmp="$tmp -I weso_plate12_153_variants_"$chr".vcf.gz"
+done < ../Strix_owl/strix_intervals/chrms_names.txt
+
+gatk --java-options "-Xmx4G" GatherVcfs \
+$tmp \
+-O weso_plate12_153_variants_whole_genome.vcf.gz
+
+gatk IndexFeatureFile -I weso_plate12_153_variants_whole_genome.vcf.gz
+
+--------------------------
+sbatch gather_vcfs.sh
+
+# Count sites
+
+zcat weso_plate12_153_variants_whole_genome.vcf.gz | grep -v "^#" | wc -l
+
+# 8,198,668 variants
+
+
+############################## ALL DONE !! #############################
+# Ok thats it for data processing! See now the filtering .txt file for #
+# data filtering and downstream output files used for analyses         #
+########################################################################
